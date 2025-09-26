@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED Sphere Control</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>LED Sphere Control</h1>
+            <div class="connection-status">
+                <span id="connection-status" class="status-indicator">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel - Controls -->
+            <aside class="control-panel">
+                <div class="panel-section">
+                    <h2>Datasets</h2>
+                    <div id="dataset-list" class="dataset-list">
+                        <!-- Datasets will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Sphere Controls</h2>
+                    <div class="control-group">
+                        <label>Rotation X: <span id="rotation-x-value">0°</span></label>
+                        <input type="range" id="rotation-x" min="-90" max="90" value="0" step="1">
+                    </div>
+                    <div class="control-group">
+                        <label>Rotation Y: <span id="rotation-y-value">0°</span></label>
+                        <input type="range" id="rotation-y" min="-180" max="180" value="0" step="1">
+                    </div>
+                    <div class="control-group">
+                        <label>Zoom: <span id="zoom-value">0%</span></label>
+                        <input type="range" id="zoom" min="0" max="85" value="0" step="1">
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Slice Configuration</h2>
+                    <div class="control-group">
+                        <label>Number of Slices:</label>
+                        <input type="number" id="slice-count" min="1" max="6" value="1">
+                    </div>
+                    <div class="control-group">
+                        <label>Total Angle (degrees):</label>
+                        <input type="number" id="slice-angle" min="90" max="360" value="360" step="90">
+                    </div>
+                    <button id="apply-slices" class="btn btn-primary">Apply Slices</button>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Connected Devices</h2>
+                    <div id="device-list" class="device-list">
+                        <!-- Connected devices will be listed here -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center Panel - 3D View -->
+            <section class="viewport-container">
+                <canvas id="sphere-canvas" class="sphere-canvas"></canvas>
+                <div id="loading-indicator" class="loading-indicator">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Initializing...</div>
+                </div>
+            </section>
+
+            <!-- Right Panel - Media Controls -->
+            <aside class="media-panel">
+                <div class="panel-section">
+                    <h2>Media Controls</h2>
+                    <div class="media-controls">
+                        <button id="play-btn" class="media-btn">
+                            <span class="icon">▶️</span> Play
+                        </button>
+                        <button id="pause-btn" class="media-btn">
+                            <span class="icon">⏸️</span> Pause
+                        </button>
+                        <button id="stop-btn" class="media-btn">
+                            <span class="icon">⏹️</span> Stop
+                        </button>
+                    </div>
+                    <div class="control-group">
+                        <label>Volume:</label>
+                        <input type="range" id="volume" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Dataset Info</h2>
+                    <div id="dataset-info" class="dataset-info">
+                        <p>No dataset loaded</p>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Performance</h2>
+                    <div id="performance-info" class="performance-info">
+                        <div>FPS: <span id="fps-counter">0</span></div>
+                        <div>Latency: <span id="latency-counter">0ms</span></div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-info">
+                <span>LED Sphere Control v1.0.0</span>
+                <span id="server-status">Server: Offline</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification-container" class="notification-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/three-renderer.js"></script>
+    <script src="js/ui-controller.js"></script>
+</body>
+</html>
