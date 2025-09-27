@@ -83,20 +83,22 @@ body {
     border-left: none;
 }
 
-/* Viewport */
+/* Ensure the canvas has the correct aspect ratio */
 .viewport-container {
-    flex: 1;
-    position: relative;
-    background-color: #000000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  flex: 1;
+  position: relative;
+  background-color: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sphere-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
+  width: 200%;
+  height: 100%;
+  display: block;
+  aspect-ratio: 2 / 1;
+  object-fit: contain;
 }
 
 /* Panel sections */
@@ -339,4 +341,50 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #555555;
+}
+/* Disabled dataset items */
+.dataset-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #2a2a2a;
+}
+
+.dataset-item.disabled:hover {
+    background-color: #2a2a2a;
+    transform: none;
+}
+
+/* Add some spacing for the exists indicator */
+.dataset-name {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+/* Slice dropdown styling */
+.slice-select {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: #333333;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.slice-select:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+/* Cursor styles for the canvas */
+.sphere-canvas {
+  width: 200%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  cursor: grab;
+}
+
+.sphere-canvas:active {
+  cursor: grabbing;
 }
