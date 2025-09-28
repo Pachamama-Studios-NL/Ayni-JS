@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const WSServer = require('../src/ws-server');
 const SphereControl = require('../src/sphere-control');
+const catalogManager = require('../src/catalog-manager');
 
 let mainWindow;
 let wsServer;
@@ -106,40 +107,32 @@ function initializeSphereControl() {
 
 // IPC handlers
 ipcMain.handle('get-datasets', async () => {
-  // Return list of available datasets
-  return [
-    {
-      id: 'dataset1',
-      name: 'Earth Day and Night',
-      type: 'image',
-      path: './assets/earth-day-night.jpg',
-      description: 'Earth showing day and night regions'
-    },
-    {
-      id: 'dataset2',
-      name: 'Ocean Currents',
-      type: 'video',
-      path: './assets/ocean-currents.mp4',
-      description: 'Global ocean current patterns'
-    },
-    {
-      id: 'dataset3',
-      name: 'Temperature Map',
-      type: 'image',
-      path: './assets/temperature-map.jpg',
-      description: 'Global temperature distribution'
-    }
-  ];
+  return catalogManager.getCatalogs();
+});
+
+ipcMain.handle('refresh-datasets', async () => {
+  return catalogManager.refreshCatalogs();
 });
 
 ipcMain.handle('load-dataset', async (event, datasetId) => {
-  // Load the specified dataset
-  console.log(`Loading dataset: ${datasetId}`);
-  return { success: true };
+  await catalogManager.getCatalogs();
+  const dataset = catalogManager.getDatasetById(datasetId);
+
+  if (!dataset) {
+    return { success: false, error: `Dataset not found: ${datasetId}` };
+  }
+
+  console.log(`Loading dataset: ${datasetId} (${dataset.sourceUri})`);
+  return { success: true, dataset };
 });
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await catalogManager.getCatalogs();
+  } catch (error) {
+    console.error('Failed to preload dataset catalogs:', error);
+  }
   createWindow();
   initializeWSServer();
   initializeSphereControl();

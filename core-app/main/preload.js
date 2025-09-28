@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   // Dataset functions
   getDatasets: () => ipcRenderer.invoke('get-datasets'),
+  refreshDatasets: () => ipcRenderer.invoke('refresh-datasets'),
   loadDataset: (datasetId) => ipcRenderer.invoke('load-dataset', datasetId),
   
   // Event listeners
