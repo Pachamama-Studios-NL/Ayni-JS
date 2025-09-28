@@ -2,6 +2,7 @@ class UIController {
   constructor() {
     this.currentDataset = null;
     this.datasets = [];
+
     this.resolutionPresets = new Map([
       ['1024x512', { width: 1024, height: 512 }],
       ['2048x1024', { width: 2048, height: 1024 }],
@@ -10,14 +11,27 @@ class UIController {
     ]);
     this.currentResolution = { width: 2048, height: 1024 };
 
+
+    this.mediaElement = null;
+
+    this.electronAPI = null;
+    this.ipcListenersAttached = false;
+
+
     this.init();
   }
 
   init() {
     this.setupEventListeners();
-    this.loadDatasets();
     this.setupIPCListeners();
+
     this.initializeResolutionControls();
+
+
+    this.configureMediaControls();
+
+    this.loadDatasets();
+
   }
 
   setupEventListeners() {
@@ -61,19 +75,24 @@ class UIController {
     
     // Media controls
     document.getElementById('play-btn').addEventListener('click', () => {
+      this.controlMediaElement('play');
       this.sendMediaControl('play');
     });
-    
+
     document.getElementById('pause-btn').addEventListener('click', () => {
+      this.controlMediaElement('pause');
       this.sendMediaControl('pause');
     });
-    
+
     document.getElementById('stop-btn').addEventListener('click', () => {
+      this.controlMediaElement('stop');
       this.sendMediaControl('stop');
     });
-    
+
     document.getElementById('volume').addEventListener('input', (e) => {
-      this.sendMediaControl('volume', parseFloat(e.target.value) / 100);
+      const level = parseFloat(e.target.value) / 100;
+      this.controlMediaElement('volume', level);
+      this.sendMediaControl('volume', level);
     });
 
     // Resolution controls
@@ -116,6 +135,7 @@ class UIController {
   }
 
   setupIPCListeners() {
+
     if (window.electronAPI) {
       // Listen for sphere updates from main process
       window.electronAPI.onSphereUpdate((data) => {
@@ -142,15 +162,49 @@ class UIController {
           this.setResolution(data, { broadcast: false });
         });
       }
+
+    const api = this.getElectronAPI();
+
+    if (!api) {
+      setTimeout(() => this.setupIPCListeners(), 100);
+      return;
     }
+
+    if (this.ipcListenersAttached) {
+      return;
+
+    }
+
+    this.ipcListenersAttached = true;
+
+    api.onSphereUpdate?.((data) => {
+      this.updateSphereUI(data);
+    });
+
+    api.onSliceUpdate?.((data) => {
+      this.updateSliceUI(data);
+    });
+
+    api.onMediaControl?.((data) => {
+      this.handleMediaControl(data);
+    });
+
+    api.onLoadDataset?.((data) => {
+      this.handleDatasetLoaded(data);
+    });
   }
-  
+
   async loadDatasets() {
     try {
-      if (window.electronAPI) {
-        this.datasets = await window.electronAPI.getDatasets();
-        this.renderDatasetList();
+      const api = this.getElectronAPI();
+
+      if (!api?.getDatasets) {
+        setTimeout(() => this.loadDatasets(), 200);
+        return;
       }
+
+      this.datasets = await api.getDatasets();
+      this.renderDatasetList();
     } catch (error) {
       this.showNotification('Failed to load datasets', 'error');
     }
@@ -180,16 +234,38 @@ class UIController {
   
   async loadDataset(datasetId) {
     try {
+
       if (window.electronAPI) {
-        await window.electronAPI.loadDataset(datasetId);
-        
-        // Update UI
+        const descriptor = await window.electronAPI.loadDataset(datasetId);
+
+        if (descriptor && descriptor.success === false) {
+          this.showNotification('Failed to load dataset', 'error');
+          return;
+        }
+
+        // Update UI immediately
         const dataset = this.datasets.find(d => d.id === datasetId);
         if (dataset) {
           this.currentDataset = dataset;
           this.updateDatasetInfo(dataset);
           this.highlightDataset(datasetId);
         }
+
+      const api = this.getElectronAPI();
+
+      if (!api?.loadDataset) {
+        return;
+      }
+
+      await api.loadDataset(datasetId);
+
+      // Update UI
+      const dataset = this.datasets.find(d => d.id === datasetId);
+      if (dataset) {
+        this.currentDataset = dataset;
+        this.updateDatasetInfo(dataset);
+        this.highlightDataset(datasetId);
+
       }
     } catch (error) {
       this.showNotification('Failed to load dataset', 'error');
@@ -249,15 +325,88 @@ class UIController {
   }
   
   handleMediaControl(data) {
-    // Handle media control updates
-    console.log('Media control:', data);
+    if (!data) {
+      return;
+    }
+
+    this.controlMediaElement(data.action, data.value);
+  }
+
+  controlMediaElement(action, value = null) {
+    if (!this.mediaElement) {
+      return;
+    }
+
+    switch (action) {
+      case 'play':
+        this.mediaElement.play().catch(() => {});
+        break;
+      case 'pause':
+        this.mediaElement.pause();
+        break;
+      case 'stop':
+        this.mediaElement.pause();
+        this.mediaElement.currentTime = 0;
+        break;
+      case 'volume':
+        if (typeof value === 'number') {
+          this.mediaElement.volume = Math.min(1, Math.max(0, value));
+          this.mediaElement.muted = this.mediaElement.volume === 0;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  configureMediaControls() {
+    const isVideo = !!this.mediaElement;
+    const controls = [
+      document.getElementById('play-btn'),
+      document.getElementById('pause-btn'),
+      document.getElementById('stop-btn')
+    ];
+
+    controls.forEach(control => {
+      if (control) {
+        control.disabled = !isVideo;
+      }
+    });
+
+    const volume = document.getElementById('volume');
+    if (volume) {
+      volume.disabled = !isVideo;
+      if (isVideo && this.mediaElement) {
+        const effectiveVolume = this.mediaElement.muted ? 0 : this.mediaElement.volume;
+        volume.value = Math.round(effectiveVolume * 100);
+      }
+    }
   }
   
-  handleDatasetLoaded(data) {
-    if (data.success) {
-      this.showNotification('Dataset loaded successfully', 'success');
-    } else {
+  async handleDatasetLoaded(dataset) {
+    if (!dataset || dataset.success === false) {
       this.showNotification('Failed to load dataset', 'error');
+      return;
+    }
+
+    try {
+      if (window.sphereRenderer) {
+        const result = await window.sphereRenderer.loadDataset(dataset);
+        this.mediaElement = result?.mediaElement || null;
+      }
+
+      const datasetMeta = this.datasets.find(d => d.id === dataset.id) || dataset;
+      this.currentDataset = datasetMeta;
+      this.updateDatasetInfo(datasetMeta);
+      this.highlightDataset(dataset.id);
+      this.configureMediaControls();
+
+      this.showNotification(`Dataset "${dataset.name || dataset.id}" loaded`, 'success');
+    } catch (error) {
+      console.error('Failed to load dataset in renderer', error);
+      this.mediaElement = null;
+      this.configureMediaControls();
+      this.showNotification('Failed to display dataset', 'error');
     }
   }
   
@@ -266,20 +415,30 @@ class UIController {
     if (window.sphereRenderer) {
       window.sphereRenderer.updateSphere(state);
     }
-    
+
     // Send to main process for broadcasting
-    if (window.electronAPI) {
-      window.electronAPI.sendSphereUpdate(state);
+    const api = this.getElectronAPI();
+    if (api?.sendSphereUpdate) {
+      api.sendSphereUpdate(state);
     }
   }
-  
+
   sendMediaControl(action, value = null) {
     const data = { action, value };
-    
+
     // Send to main process
-    if (window.electronAPI) {
-      window.electronAPI.sendMediaControl(data);
+    const api = this.getElectronAPI();
+    if (api?.sendMediaControl) {
+      api.sendMediaControl(data);
     }
+  }
+
+  getElectronAPI() {
+    if (!this.electronAPI && window.electronAPI) {
+      this.electronAPI = window.electronAPI;
+    }
+
+    return this.electronAPI;
   }
   
   showNotification(message, type = 'info') {
