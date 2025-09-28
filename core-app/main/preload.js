@@ -14,7 +14,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Send sphere updates to main process
   sendSphereUpdate: (data) => ipcRenderer.send('sphere-update', data),
-  
+  sendSliceUpdate: (data) => ipcRenderer.send('slice-update', data),
+  sendMediaControl: (data) => ipcRenderer.send('media-control', data),
+
   // Remove all listeners
   removeAllListeners: () => ipcRenderer.removeAllListeners()
 });

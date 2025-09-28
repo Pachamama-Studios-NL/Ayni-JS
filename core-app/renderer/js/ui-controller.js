@@ -2,18 +2,26 @@ class UIController {
   constructor() {
     this.currentDataset = null;
     this.datasets = [];
+
     this.mediaElement = null;
+
+    this.electronAPI = null;
+    this.ipcListenersAttached = false;
+
 
     this.init();
   }
-  
+
   init() {
     this.setupEventListeners();
-    this.loadDatasets();
     this.setupIPCListeners();
+
     this.configureMediaControls();
+
+    this.loadDatasets();
+
   }
-  
+
   setupEventListeners() {
     // Sphere controls
     const rotationX = document.getElementById('rotation-x');
@@ -75,37 +83,49 @@ class UIController {
       this.sendMediaControl('volume', level);
     });
   }
-  
+
   setupIPCListeners() {
-    if (window.electronAPI) {
-      // Listen for sphere updates from main process
-      window.electronAPI.onSphereUpdate((data) => {
-        this.updateSphereUI(data);
-      });
-      
-      // Listen for slice updates
-      window.electronAPI.onSliceUpdate((data) => {
-        this.updateSliceUI(data);
-      });
-      
-      // Listen for media controls
-      window.electronAPI.onMediaControl((data) => {
-        this.handleMediaControl(data);
-      });
-      
-      // Listen for dataset loading
-      window.electronAPI.onLoadDataset((data) => {
-        this.handleDatasetLoaded(data);
-      });
+    const api = this.getElectronAPI();
+
+    if (!api) {
+      setTimeout(() => this.setupIPCListeners(), 100);
+      return;
     }
+
+    if (this.ipcListenersAttached) {
+      return;
+    }
+
+    this.ipcListenersAttached = true;
+
+    api.onSphereUpdate?.((data) => {
+      this.updateSphereUI(data);
+    });
+
+    api.onSliceUpdate?.((data) => {
+      this.updateSliceUI(data);
+    });
+
+    api.onMediaControl?.((data) => {
+      this.handleMediaControl(data);
+    });
+
+    api.onLoadDataset?.((data) => {
+      this.handleDatasetLoaded(data);
+    });
   }
-  
+
   async loadDatasets() {
     try {
-      if (window.electronAPI) {
-        this.datasets = await window.electronAPI.getDatasets();
-        this.renderDatasetList();
+      const api = this.getElectronAPI();
+
+      if (!api?.getDatasets) {
+        setTimeout(() => this.loadDatasets(), 200);
+        return;
       }
+
+      this.datasets = await api.getDatasets();
+      this.renderDatasetList();
     } catch (error) {
       this.showNotification('Failed to load datasets', 'error');
     }
@@ -135,6 +155,7 @@ class UIController {
   
   async loadDataset(datasetId) {
     try {
+
       if (window.electronAPI) {
         const descriptor = await window.electronAPI.loadDataset(datasetId);
 
@@ -150,6 +171,22 @@ class UIController {
           this.updateDatasetInfo(dataset);
           this.highlightDataset(datasetId);
         }
+
+      const api = this.getElectronAPI();
+
+      if (!api?.loadDataset) {
+        return;
+      }
+
+      await api.loadDataset(datasetId);
+
+      // Update UI
+      const dataset = this.datasets.find(d => d.id === datasetId);
+      if (dataset) {
+        this.currentDataset = dataset;
+        this.updateDatasetInfo(dataset);
+        this.highlightDataset(datasetId);
+
       }
     } catch (error) {
       this.showNotification('Failed to load dataset', 'error');
@@ -299,20 +336,30 @@ class UIController {
     if (window.sphereRenderer) {
       window.sphereRenderer.updateSphere(state);
     }
-    
+
     // Send to main process for broadcasting
-    if (window.electronAPI) {
-      window.electronAPI.sendSphereUpdate(state);
+    const api = this.getElectronAPI();
+    if (api?.sendSphereUpdate) {
+      api.sendSphereUpdate(state);
     }
   }
-  
+
   sendMediaControl(action, value = null) {
     const data = { action, value };
-    
+
     // Send to main process
-    if (window.electronAPI) {
-      window.electronAPI.sendMediaControl(data);
+    const api = this.getElectronAPI();
+    if (api?.sendMediaControl) {
+      api.sendMediaControl(data);
     }
+  }
+
+  getElectronAPI() {
+    if (!this.electronAPI && window.electronAPI) {
+      this.electronAPI = window.electronAPI;
+    }
+
+    return this.electronAPI;
   }
   
   showNotification(message, type = 'info') {

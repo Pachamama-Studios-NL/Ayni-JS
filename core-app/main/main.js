@@ -101,35 +101,37 @@ function createWindow() {
 // Initialize WebSocket server
 function initializeWSServer() {
   wsServer = new WSServer(8080);
-  
+
   // Handle sphere control messages
   wsServer.on('sphere-control', (data) => {
     if (sphereControl) {
       sphereControl.updateSphere(data);
     }
-    
-    // Forward to renderer for UI update
-    if (mainWindow) {
-      mainWindow.webContents.send('sphere-update', data);
+
+    if (wsServer) {
+      wsServer.broadcast('sphere-update', data);
     }
   });
-  
+
   // Handle slice control messages
   wsServer.on('slice-control', (data) => {
     if (sphereControl) {
       sphereControl.updateSlice(data);
     }
-    
-    // Forward to renderer for UI update
-    if (mainWindow) {
-      mainWindow.webContents.send('slice-update', data);
+
+    if (wsServer) {
+      wsServer.broadcast('slice-update', data);
     }
   });
-  
+
   // Handle media control messages
   wsServer.on('media-control', (data) => {
     if (mainWindow) {
       mainWindow.webContents.send('media-control', data);
+    }
+
+    if (wsServer) {
+      wsServer.broadcast('media-control', data);
     }
   });
   
@@ -156,15 +158,19 @@ function initializeWSServer() {
 // Initialize sphere control
 function initializeSphereControl() {
   sphereControl = new SphereControl();
-  
-  // Handle sphere updates from renderer
+
   sphereControl.on('sphere-update', (data) => {
-    // Broadcast to all connected clients
-    if (wsServer) {
-      wsServer.broadcast('sphere-update', data);
+    if (mainWindow) {
+      mainWindow.webContents.send('sphere-update', data);
     }
   });
-  
+
+  sphereControl.on('slice-update', (data) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('slice-update', data);
+    }
+  });
+
   console.log('Sphere control initialized');
 }
 
@@ -196,6 +202,36 @@ ipcMain.handle('load-dataset', async (event, datasetId) => {
   console.log(`Loaded dataset: ${datasetId}`);
 
   return descriptor;
+});
+
+ipcMain.on('sphere-update', (event, data) => {
+  if (sphereControl) {
+    sphereControl.updateSphere(data);
+  }
+
+  if (wsServer) {
+    wsServer.broadcast('sphere-update', data);
+  }
+});
+
+ipcMain.on('slice-update', (event, data) => {
+  if (sphereControl) {
+    sphereControl.updateSlice(data);
+  }
+
+  if (wsServer) {
+    wsServer.broadcast('slice-update', data);
+  }
+});
+
+ipcMain.on('media-control', (event, data) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('media-control', data);
+  }
+
+  if (wsServer) {
+    wsServer.broadcast('media-control', data);
+  }
 });
 
 // App event handlers
