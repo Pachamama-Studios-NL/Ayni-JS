@@ -2,8 +2,12 @@ class UIController {
   constructor() {
     this.currentDataset = null;
     this.datasets = [];
+
+    this.mediaElement = null;
+
     this.electronAPI = null;
     this.ipcListenersAttached = false;
+
 
     this.init();
   }
@@ -11,7 +15,11 @@ class UIController {
   init() {
     this.setupEventListeners();
     this.setupIPCListeners();
+
+    this.configureMediaControls();
+
     this.loadDatasets();
+
   }
 
   setupEventListeners() {
@@ -55,19 +63,24 @@ class UIController {
     
     // Media controls
     document.getElementById('play-btn').addEventListener('click', () => {
+      this.controlMediaElement('play');
       this.sendMediaControl('play');
     });
-    
+
     document.getElementById('pause-btn').addEventListener('click', () => {
+      this.controlMediaElement('pause');
       this.sendMediaControl('pause');
     });
-    
+
     document.getElementById('stop-btn').addEventListener('click', () => {
+      this.controlMediaElement('stop');
       this.sendMediaControl('stop');
     });
-    
+
     document.getElementById('volume').addEventListener('input', (e) => {
-      this.sendMediaControl('volume', parseFloat(e.target.value) / 100);
+      const level = parseFloat(e.target.value) / 100;
+      this.controlMediaElement('volume', level);
+      this.sendMediaControl('volume', level);
     });
   }
 
@@ -142,6 +155,23 @@ class UIController {
   
   async loadDataset(datasetId) {
     try {
+
+      if (window.electronAPI) {
+        const descriptor = await window.electronAPI.loadDataset(datasetId);
+
+        if (descriptor && descriptor.success === false) {
+          this.showNotification('Failed to load dataset', 'error');
+          return;
+        }
+
+        // Update UI immediately
+        const dataset = this.datasets.find(d => d.id === datasetId);
+        if (dataset) {
+          this.currentDataset = dataset;
+          this.updateDatasetInfo(dataset);
+          this.highlightDataset(datasetId);
+        }
+
       const api = this.getElectronAPI();
 
       if (!api?.loadDataset) {
@@ -156,6 +186,7 @@ class UIController {
         this.currentDataset = dataset;
         this.updateDatasetInfo(dataset);
         this.highlightDataset(datasetId);
+
       }
     } catch (error) {
       this.showNotification('Failed to load dataset', 'error');
@@ -215,15 +246,88 @@ class UIController {
   }
   
   handleMediaControl(data) {
-    // Handle media control updates
-    console.log('Media control:', data);
+    if (!data) {
+      return;
+    }
+
+    this.controlMediaElement(data.action, data.value);
+  }
+
+  controlMediaElement(action, value = null) {
+    if (!this.mediaElement) {
+      return;
+    }
+
+    switch (action) {
+      case 'play':
+        this.mediaElement.play().catch(() => {});
+        break;
+      case 'pause':
+        this.mediaElement.pause();
+        break;
+      case 'stop':
+        this.mediaElement.pause();
+        this.mediaElement.currentTime = 0;
+        break;
+      case 'volume':
+        if (typeof value === 'number') {
+          this.mediaElement.volume = Math.min(1, Math.max(0, value));
+          this.mediaElement.muted = this.mediaElement.volume === 0;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  configureMediaControls() {
+    const isVideo = !!this.mediaElement;
+    const controls = [
+      document.getElementById('play-btn'),
+      document.getElementById('pause-btn'),
+      document.getElementById('stop-btn')
+    ];
+
+    controls.forEach(control => {
+      if (control) {
+        control.disabled = !isVideo;
+      }
+    });
+
+    const volume = document.getElementById('volume');
+    if (volume) {
+      volume.disabled = !isVideo;
+      if (isVideo && this.mediaElement) {
+        const effectiveVolume = this.mediaElement.muted ? 0 : this.mediaElement.volume;
+        volume.value = Math.round(effectiveVolume * 100);
+      }
+    }
   }
   
-  handleDatasetLoaded(data) {
-    if (data.success) {
-      this.showNotification('Dataset loaded successfully', 'success');
-    } else {
+  async handleDatasetLoaded(dataset) {
+    if (!dataset || dataset.success === false) {
       this.showNotification('Failed to load dataset', 'error');
+      return;
+    }
+
+    try {
+      if (window.sphereRenderer) {
+        const result = await window.sphereRenderer.loadDataset(dataset);
+        this.mediaElement = result?.mediaElement || null;
+      }
+
+      const datasetMeta = this.datasets.find(d => d.id === dataset.id) || dataset;
+      this.currentDataset = datasetMeta;
+      this.updateDatasetInfo(datasetMeta);
+      this.highlightDataset(dataset.id);
+      this.configureMediaControls();
+
+      this.showNotification(`Dataset "${dataset.name || dataset.id}" loaded`, 'success');
+    } catch (error) {
+      console.error('Failed to load dataset in renderer', error);
+      this.mediaElement = null;
+      this.configureMediaControls();
+      this.showNotification('Failed to display dataset', 'error');
     }
   }
   

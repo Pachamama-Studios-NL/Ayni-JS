@@ -1,11 +1,65 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const WSServer = require('../src/ws-server');
 const SphereControl = require('../src/sphere-control');
 
 let mainWindow;
 let wsServer;
 let sphereControl;
+
+const DATASETS = [
+  {
+    id: 'dataset1',
+    name: 'Earth Day and Night',
+    type: 'image',
+    file: 'earth-day-night.jpg',
+    description: 'Earth showing day and night regions',
+    projection: 'sphere'
+  },
+  {
+    id: 'dataset2',
+    name: 'Ocean Currents',
+    type: 'video',
+    file: 'ocean-currents.mp4',
+    description: 'Global ocean current patterns',
+    projection: 'sphere',
+    streaming: {
+      loop: true,
+      muted: true
+    }
+  },
+  {
+    id: 'dataset3',
+    name: 'Temperature Map',
+    type: 'image',
+    file: 'temperature-map.jpg',
+    description: 'Global temperature distribution',
+    projection: 'sphere'
+  }
+];
+
+function resolveDatasetDescriptor(dataset) {
+  if (!dataset) {
+    return null;
+  }
+
+  const assetPath = path.resolve(__dirname, '../assets', dataset.file);
+  const descriptor = {
+    id: dataset.id,
+    name: dataset.name,
+    type: dataset.type,
+    description: dataset.description,
+    projection: dataset.projection || 'sphere',
+    uri: pathToFileURL(assetPath).href
+  };
+
+  if (dataset.streaming) {
+    descriptor.streaming = dataset.streaming;
+  }
+
+  return descriptor;
+}
 
 function createWindow() {
   // Get primary display dimensions
@@ -83,7 +137,17 @@ function initializeWSServer() {
   
   // Handle dataset loading
   wsServer.on('load-dataset', (data) => {
-    if (mainWindow) {
+    if (!mainWindow) {
+      return;
+    }
+
+    const datasetId = typeof data === 'string' ? data : data?.id;
+    const dataset = DATASETS.find(d => d.id === datasetId);
+    const descriptor = resolveDatasetDescriptor(dataset);
+
+    if (descriptor) {
+      mainWindow.webContents.send('load-dataset', descriptor);
+    } else if (data && data.uri) {
       mainWindow.webContents.send('load-dataset', data);
     }
   });
@@ -111,37 +175,33 @@ function initializeSphereControl() {
 }
 
 // IPC handlers
-ipcMain.handle('get-datasets', async () => {
-  // Return list of available datasets
-  return [
-    {
-      id: 'dataset1',
-      name: 'Earth Day and Night',
-      type: 'image',
-      path: './assets/earth-day-night.jpg',
-      description: 'Earth showing day and night regions'
-    },
-    {
-      id: 'dataset2',
-      name: 'Ocean Currents',
-      type: 'video',
-      path: './assets/ocean-currents.mp4',
-      description: 'Global ocean current patterns'
-    },
-    {
-      id: 'dataset3',
-      name: 'Temperature Map',
-      type: 'image',
-      path: './assets/temperature-map.jpg',
-      description: 'Global temperature distribution'
-    }
-  ];
-});
+ipcMain.handle('get-datasets', async () =>
+  DATASETS.map(({ id, name, type, description }) => ({
+    id,
+    name,
+    type,
+    description
+  }))
+);
 
 ipcMain.handle('load-dataset', async (event, datasetId) => {
-  // Load the specified dataset
-  console.log(`Loading dataset: ${datasetId}`);
-  return { success: true };
+  const dataset = DATASETS.find(d => d.id === datasetId);
+
+  if (!dataset) {
+    const errorMessage = `Dataset not found: ${datasetId}`;
+    console.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+
+  const descriptor = resolveDatasetDescriptor(dataset);
+
+  if (descriptor && mainWindow) {
+    mainWindow.webContents.send('load-dataset', descriptor);
+  }
+
+  console.log(`Loaded dataset: ${datasetId}`);
+
+  return descriptor;
 });
 
 ipcMain.on('sphere-update', (event, data) => {
