@@ -135,6 +135,55 @@ body {
     color: #ffffff;
 }
 
+.resolution-picker {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.resolution-picker select {
+    flex: 1;
+    padding: 0.4rem 0.5rem;
+    background-color: #333333;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    color: #ffffff;
+}
+
+.resolution-custom {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.resolution-custom[aria-hidden="true"] {
+    display: none;
+}
+
+.resolution-value,
+.resolution-multiply {
+    color: #b0b0b0;
+    font-variant-numeric: tabular-nums;
+}
+
+.resolution-summary {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #b0b0b0;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
 /* Buttons */
 .btn {
     padding: 0.5rem 1rem;

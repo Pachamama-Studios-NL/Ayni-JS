@@ -66,15 +66,19 @@ class WSServer extends EventEmitter {
         case 'control-sphere':
           this.handleSphereControl(clientId, data);
           break;
-          
+
         case 'control-slice':
           this.handleSliceControl(clientId, data);
           break;
-          
+
         case 'request-slice':
           this.handleSliceRequest(clientId, data);
           break;
-          
+
+        case 'resolution-change':
+          this.handleResolutionChange(clientId, data);
+          break;
+
         default:
           console.log(`Unknown message type: ${data.type}`);
       }
@@ -169,6 +173,18 @@ class WSServer extends EventEmitter {
         }
       }
     });
+  }
+
+  handleResolutionChange(clientId, data) {
+    const payload = data.data || data;
+
+    this.broadcast({
+      type: 'resolution-change',
+      data: payload,
+      source: clientId
+    }, null);
+
+    this.emit('resolution-change', payload);
   }
 }
 
