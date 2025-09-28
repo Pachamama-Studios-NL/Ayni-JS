@@ -8,6 +8,7 @@ class KioskApp {
       zoom: 0,
       isDragging: false
     };
+    this.renderResolution = { width: 2048, height: 1024 };
     
     this.init();
   }
@@ -64,6 +65,13 @@ class KioskApp {
         
       case 'slice-update':
         // Update slice display if not controlled by this kiosk
+        break;
+
+      case 'resolution-change':
+        if (message.data) {
+          this.renderResolution = message.data;
+          console.log(`Render resolution updated to ${this.renderResolution.width}x${this.renderResolution.height}`);
+        }
         break;
     }
   }

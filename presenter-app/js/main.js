@@ -7,6 +7,7 @@ class PresenterApp {
       zoom: 0,
       isDragging: false
     };
+    this.renderResolution = { width: 2048, height: 1024 };
     
     this.init();
   }
@@ -63,9 +64,16 @@ class PresenterApp {
       case 'sphere-update':
         // Update local sphere state if needed
         break;
-        
+
       case 'slice-update':
         // Update slice display
+        break;
+
+      case 'resolution-change':
+        if (message.data) {
+          this.renderResolution = message.data;
+          console.log(`Render resolution updated to ${this.renderResolution.width}x${this.renderResolution.height}`);
+        }
         break;
     }
   }

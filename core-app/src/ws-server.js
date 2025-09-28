@@ -64,19 +64,25 @@ class WSServer extends EventEmitter {
         case 'control-sphere':
           this.emit('sphere-control', data);
           break;
-          
+
         case 'control-slice':
           this.emit('slice-control', data);
           break;
-          
+
         case 'media-control':
           this.emit('media-control', data);
           break;
-          
+
         case 'load-dataset':
           this.emit('load-dataset', data);
           break;
-          
+
+        case 'resolution-change': {
+          const payload = data.data || data;
+          this.emit('resolution-change', payload, clientId);
+          break;
+        }
+
         default:
           console.log(`Unknown message type: ${data.type}`);
       }

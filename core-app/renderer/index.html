@@ -41,6 +41,27 @@
                         <label>Zoom: <span id="zoom-value">0%</span></label>
                         <input type="range" id="zoom" min="0" max="85" value="0" step="1">
                     </div>
+                    <div class="control-group">
+                        <label for="resolution-select">Render Resolution</label>
+                        <div class="resolution-picker">
+                            <select id="resolution-select">
+                                <option value="1024x512">1024 × 512</option>
+                                <option value="2048x1024" selected>2048 × 1024</option>
+                                <option value="3072x1536">3072 × 1536</option>
+                                <option value="4096x2048">4096 × 2048</option>
+                                <option value="custom">Custom…</option>
+                            </select>
+                        </div>
+                        <div class="resolution-custom" id="resolution-custom-controls" aria-hidden="true">
+                            <label for="custom-resolution-width" class="sr-only">Custom width</label>
+                            <input type="number" id="custom-resolution-width" min="512" max="4096" step="64" value="2048" disabled>
+                            <span class="resolution-multiply">×</span>
+                            <span id="custom-resolution-height" class="resolution-value">1024</span>
+                        </div>
+                        <div class="resolution-summary">
+                            Active: <span id="resolution-summary">2048 × 1024</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="panel-section">

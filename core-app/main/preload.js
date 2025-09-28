@@ -11,11 +11,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSliceUpdate: (callback) => ipcRenderer.on('slice-update', (event, data) => callback(data)),
   onMediaControl: (callback) => ipcRenderer.on('media-control', (event, data) => callback(data)),
   onLoadDataset: (callback) => ipcRenderer.on('load-dataset', (event, data) => callback(data)),
-  
+  onResolutionChange: (callback) => ipcRenderer.on('resolution-change', (event, data) => callback(data)),
+
   // Send sphere updates to main process
   sendSphereUpdate: (data) => ipcRenderer.send('sphere-update', data),
+
+  sendResolutionChange: (data) => ipcRenderer.send('resolution-change', data),
+
   sendSliceUpdate: (data) => ipcRenderer.send('slice-update', data),
-  sendMediaControl: (data) => ipcRenderer.send('media-control', data),
+
 
   // Remove all listeners
   removeAllListeners: () => ipcRenderer.removeAllListeners()

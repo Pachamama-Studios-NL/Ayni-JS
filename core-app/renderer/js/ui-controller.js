@@ -3,6 +3,15 @@ class UIController {
     this.currentDataset = null;
     this.datasets = [];
 
+    this.resolutionPresets = new Map([
+      ['1024x512', { width: 1024, height: 512 }],
+      ['2048x1024', { width: 2048, height: 1024 }],
+      ['3072x1536', { width: 3072, height: 1536 }],
+      ['4096x2048', { width: 4096, height: 2048 }]
+    ]);
+    this.currentResolution = { width: 2048, height: 1024 };
+
+
     this.mediaElement = null;
 
     this.electronAPI = null;
@@ -15,6 +24,9 @@ class UIController {
   init() {
     this.setupEventListeners();
     this.setupIPCListeners();
+
+    this.initializeResolutionControls();
+
 
     this.configureMediaControls();
 
@@ -82,9 +94,75 @@ class UIController {
       this.controlMediaElement('volume', level);
       this.sendMediaControl('volume', level);
     });
+
+    // Resolution controls
+    const resolutionSelect = document.getElementById('resolution-select');
+    const customWidthInput = document.getElementById('custom-resolution-width');
+
+    if (resolutionSelect) {
+      resolutionSelect.addEventListener('change', (event) => {
+        const value = event.target.value;
+
+        if (value === 'custom') {
+          this.setCustomControlsEnabled(true);
+          if (customWidthInput) {
+            customWidthInput.focus();
+          }
+          return;
+        }
+
+        const preset = this.resolutionPresets.get(value);
+        if (preset) {
+          this.setCustomControlsEnabled(false);
+          this.setResolution(preset, { broadcast: true });
+        }
+      });
+    }
+
+    if (customWidthInput) {
+      customWidthInput.addEventListener('input', (event) => {
+        const width = Number(event.target.value);
+        const preview = this.sanitizeResolution({ width });
+        this.updateCustomResolutionInput(preview, true);
+        this.updateResolutionSummary(preview);
+      });
+
+      customWidthInput.addEventListener('change', (event) => {
+        const width = Number(event.target.value);
+        this.setResolution({ width }, { broadcast: true });
+      });
+    }
   }
 
   setupIPCListeners() {
+
+    if (window.electronAPI) {
+      // Listen for sphere updates from main process
+      window.electronAPI.onSphereUpdate((data) => {
+        this.updateSphereUI(data);
+      });
+      
+      // Listen for slice updates
+      window.electronAPI.onSliceUpdate((data) => {
+        this.updateSliceUI(data);
+      });
+      
+      // Listen for media controls
+      window.electronAPI.onMediaControl((data) => {
+        this.handleMediaControl(data);
+      });
+
+      // Listen for dataset loading
+      window.electronAPI.onLoadDataset((data) => {
+        this.handleDatasetLoaded(data);
+      });
+
+      if (window.electronAPI.onResolutionChange) {
+        window.electronAPI.onResolutionChange((data) => {
+          this.setResolution(data, { broadcast: false });
+        });
+      }
+
     const api = this.getElectronAPI();
 
     if (!api) {
@@ -94,6 +172,7 @@ class UIController {
 
     if (this.ipcListenersAttached) {
       return;
+
     }
 
     this.ipcListenersAttached = true;
@@ -394,6 +473,153 @@ class UIController {
   updatePerformance(fps, latency) {
     document.getElementById('fps-counter').textContent = fps;
     document.getElementById('latency-counter').textContent = `${latency}ms`;
+  }
+
+  initializeResolutionControls() {
+    const initial = this.setResolution(this.currentResolution, { broadcast: true, force: true });
+    if (initial) {
+      this.updateResolutionSummary(initial);
+    }
+  }
+
+  setResolution(resolution, { broadcast = false, force = false } = {}) {
+    const sanitized = this.sanitizeResolution(resolution);
+    let appliedResolution = sanitized;
+
+    if (window.sphereRenderer && typeof window.sphereRenderer.setResolution === 'function') {
+      appliedResolution = window.sphereRenderer.setResolution(sanitized);
+    }
+
+    const hasChanged = force || !this.areResolutionsEqual(appliedResolution, this.currentResolution);
+    if (!hasChanged) {
+      this.updateResolutionSelect(appliedResolution);
+      this.updateCustomResolutionInput(appliedResolution, this.shouldUseCustom(appliedResolution));
+      this.updateResolutionSummary(appliedResolution);
+      return appliedResolution;
+    }
+
+    this.currentResolution = appliedResolution;
+    const useCustom = this.shouldUseCustom(appliedResolution);
+
+    this.updateResolutionSelect(appliedResolution);
+    this.updateCustomResolutionInput(appliedResolution, useCustom);
+    this.updateResolutionSummary(appliedResolution);
+
+    if (broadcast && window.electronAPI && typeof window.electronAPI.sendResolutionChange === 'function') {
+      window.electronAPI.sendResolutionChange(appliedResolution);
+    }
+
+    return appliedResolution;
+  }
+
+  sanitizeResolution(resolution = {}) {
+    const minWidth = 512;
+    const maxWidth = 4096;
+    const minHeight = minWidth / 2;
+    const maxHeight = 2048;
+
+    let width = Number(resolution.width);
+    let height = Number(resolution.height);
+
+    if (!Number.isFinite(width) || width <= 0) {
+      width = this.currentResolution.width;
+    }
+
+    width = Math.round(width);
+    width = Math.min(maxWidth, Math.max(minWidth, width));
+
+    if (!Number.isFinite(height) || height <= 0) {
+      height = width / 2;
+    }
+
+    height = Math.round(height);
+    height = Math.min(maxHeight, Math.max(minHeight, height));
+
+    // Enforce a strict 2:1 aspect ratio
+    width = Math.round(height * 2);
+
+    if (width > maxWidth) {
+      width = maxWidth;
+      height = Math.round(width / 2);
+    }
+
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * 2;
+    }
+
+    if (width < minWidth) {
+      width = minWidth;
+      height = Math.round(width / 2);
+    }
+
+    if (height < minHeight) {
+      height = minHeight;
+      width = height * 2;
+    }
+
+    return {
+      width,
+      height
+    };
+  }
+
+  updateResolutionSelect(resolution) {
+    const resolutionSelect = document.getElementById('resolution-select');
+    if (!resolutionSelect) return;
+
+    const presetEntry = Array.from(this.resolutionPresets.entries())
+      .find(([, preset]) => this.areResolutionsEqual(preset, resolution));
+
+    if (presetEntry) {
+      resolutionSelect.value = presetEntry[0];
+      this.setCustomControlsEnabled(false);
+    } else {
+      resolutionSelect.value = 'custom';
+      this.setCustomControlsEnabled(true);
+    }
+  }
+
+  updateCustomResolutionInput(resolution, enableCustom) {
+    const customWidthInput = document.getElementById('custom-resolution-width');
+    const customHeightLabel = document.getElementById('custom-resolution-height');
+    const customContainer = document.getElementById('resolution-custom-controls');
+
+    if (!customWidthInput || !customHeightLabel || !customContainer) {
+      return;
+    }
+
+    customWidthInput.disabled = !enableCustom;
+    customContainer.setAttribute('aria-hidden', enableCustom ? 'false' : 'true');
+    customWidthInput.value = resolution.width;
+    customHeightLabel.textContent = `${resolution.height}`;
+  }
+
+  updateResolutionSummary(resolution) {
+    const summary = document.getElementById('resolution-summary');
+    if (!summary) return;
+
+    const target = resolution || this.currentResolution;
+    summary.textContent = `${target.width} × ${target.height}`;
+  }
+
+  setCustomControlsEnabled(enabled) {
+    const customContainer = document.getElementById('resolution-custom-controls');
+    const customWidthInput = document.getElementById('custom-resolution-width');
+
+    if (!customContainer || !customWidthInput) return;
+
+    customContainer.setAttribute('aria-hidden', enabled ? 'false' : 'true');
+    customWidthInput.disabled = !enabled;
+  }
+
+  shouldUseCustom(resolution) {
+    return !Array.from(this.resolutionPresets.values()).some((preset) => this.areResolutionsEqual(preset, resolution));
+  }
+
+  areResolutionsEqual(a, b) {
+    if (!a || !b) return false;
+    return a.width === b.width && a.height === b.height;
   }
 }
 

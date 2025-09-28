@@ -8,6 +8,16 @@ let mainWindow;
 let wsServer;
 let sphereControl;
 
+
+function broadcastResolution(resolution, excludeClientId = null) {
+  if (mainWindow) {
+    mainWindow.webContents.send('resolution-change', resolution);
+  }
+
+  if (wsServer) {
+    wsServer.broadcast('resolution-change', resolution, excludeClientId);
+  }
+
 const DATASETS = [
   {
     id: 'dataset1',
@@ -59,6 +69,7 @@ function resolveDatasetDescriptor(dataset) {
   }
 
   return descriptor;
+
 }
 
 function createWindow() {
@@ -134,7 +145,7 @@ function initializeWSServer() {
       wsServer.broadcast('media-control', data);
     }
   });
-  
+
   // Handle dataset loading
   wsServer.on('load-dataset', (data) => {
     if (!mainWindow) {
@@ -151,7 +162,18 @@ function initializeWSServer() {
       mainWindow.webContents.send('load-dataset', data);
     }
   });
-  
+
+  wsServer.on('resolution-change', (data, clientId) => {
+    const payload = data && data.data ? data.data : data;
+
+    if (sphereControl) {
+      const updated = sphereControl.updateResolution(payload);
+      broadcastResolution(updated, clientId);
+    } else {
+      broadcastResolution(payload, clientId);
+    }
+  });
+
   console.log('WebSocket server initialized');
 }
 
@@ -159,17 +181,22 @@ function initializeWSServer() {
 function initializeSphereControl() {
   sphereControl = new SphereControl();
 
+
+  // Handle sphere updates from renderer
+
   sphereControl.on('sphere-update', (data) => {
     if (mainWindow) {
       mainWindow.webContents.send('sphere-update', data);
     }
   });
 
+
   sphereControl.on('slice-update', (data) => {
     if (mainWindow) {
       mainWindow.webContents.send('slice-update', data);
     }
   });
+
 
   console.log('Sphere control initialized');
 }
@@ -231,6 +258,21 @@ ipcMain.on('media-control', (event, data) => {
 
   if (wsServer) {
     wsServer.broadcast('media-control', data);
+  }
+});
+
+ipcMain.on('sphere-update', (event, data) => {
+  if (sphereControl) {
+    sphereControl.updateSphere(data);
+  }
+});
+
+ipcMain.on('resolution-change', (event, data) => {
+  if (sphereControl) {
+    const updated = sphereControl.updateResolution(data);
+    broadcastResolution(updated);
+  } else {
+    broadcastResolution(data);
   }
 });
 
