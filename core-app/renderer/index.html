@@ -22,6 +22,16 @@
             <aside class="control-panel">
                 <div class="panel-section">
                     <h2>Datasets</h2>
+                    <div class="catalog-toolbar">
+                        <button id="refresh-datasets" class="btn btn-secondary">Refresh catalogs</button>
+                        <div class="catalog-status">
+                            <span id="catalog-last-updated">Loading catalogs...</span>
+                            <span id="catalog-directory" class="catalog-directory"></span>
+                        </div>
+                    </div>
+                    <div id="catalog-errors" class="catalog-errors">
+                        <div class="catalog-message">No validation issues detected.</div>
+                    </div>
                     <div id="dataset-list" class="dataset-list">
                         <!-- Datasets will be loaded here -->
                     </div>

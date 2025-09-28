@@ -3,6 +3,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const WSServer = require('../src/ws-server');
 const SphereControl = require('../src/sphere-control');
+const catalogManager = require('../src/catalog-manager');
 
 let mainWindow;
 let wsServer;
@@ -202,6 +203,26 @@ function initializeSphereControl() {
 }
 
 // IPC handlers
+
+ipcMain.handle('get-datasets', async () => {
+  return catalogManager.getCatalogs();
+});
+
+ipcMain.handle('refresh-datasets', async () => {
+  return catalogManager.refreshCatalogs();
+});
+
+ipcMain.handle('load-dataset', async (event, datasetId) => {
+  await catalogManager.getCatalogs();
+  const dataset = catalogManager.getDatasetById(datasetId);
+
+  if (!dataset) {
+    return { success: false, error: `Dataset not found: ${datasetId}` };
+  }
+
+  console.log(`Loading dataset: ${datasetId} (${dataset.sourceUri})`);
+  return { success: true, dataset };
+
 ipcMain.handle('get-datasets', async () =>
   DATASETS.map(({ id, name, type, description }) => ({
     id,
@@ -274,10 +295,16 @@ ipcMain.on('resolution-change', (event, data) => {
   } else {
     broadcastResolution(data);
   }
+
 });
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await catalogManager.getCatalogs();
+  } catch (error) {
+    console.error('Failed to preload dataset catalogs:', error);
+  }
   createWindow();
   initializeWSServer();
   initializeSphereControl();

@@ -1,0 +1,21 @@
+{
+  "catalog": "Imagery",
+  "datasets": [
+    {
+      "id": "earth-day-night",
+      "name": "Earth Day and Night",
+      "mediaType": "image",
+      "format": "image/jpeg",
+      "sourceUri": "./assets/earth-day-night.jpg",
+      "description": "Earth showing day and night regions"
+    },
+    {
+      "id": "temperature-map",
+      "name": "Temperature Map",
+      "mediaType": "image",
+      "format": "image/jpeg",
+      "sourceUri": "./assets/temperature-map.jpg",
+      "description": "Global temperature distribution"
+    }
+  ]
+}

@@ -3,6 +3,11 @@ class UIController {
     this.currentDataset = null;
     this.datasets = [];
 
+    this.catalogErrors = [];
+    this.catalogLastUpdated = null;
+    this.catalogDir = null;
+
+
     this.resolutionPresets = new Map([
       ['1024x512', { width: 1024, height: 512 }],
       ['2048x1024', { width: 2048, height: 1024 }],
@@ -23,6 +28,9 @@ class UIController {
 
   init() {
     this.setupEventListeners();
+
+    this.loadDatasets({ silent: true });
+
     this.setupIPCListeners();
 
     this.initializeResolutionControls();
@@ -95,6 +103,12 @@ class UIController {
       this.sendMediaControl('volume', level);
     });
 
+
+    const refreshCatalogs = document.getElementById('refresh-datasets');
+    if (refreshCatalogs) {
+      refreshCatalogs.addEventListener('click', () => {
+        this.loadDatasets({ refresh: true });
+
     // Resolution controls
     const resolutionSelect = document.getElementById('resolution-select');
     const customWidthInput = document.getElementById('custom-resolution-width');
@@ -130,6 +144,7 @@ class UIController {
       customWidthInput.addEventListener('change', (event) => {
         const width = Number(event.target.value);
         this.setResolution({ width }, { broadcast: true });
+
       });
     }
   }
@@ -194,6 +209,26 @@ class UIController {
     });
   }
 
+  
+  async loadDatasets({ silent = false, refresh = false } = {}) {
+    try {
+      if (window.electronAPI) {
+        const response = refresh
+          ? await window.electronAPI.refreshDatasets()
+          : await window.electronAPI.getDatasets();
+        this.applyCatalogResponse(response);
+
+        if (!silent) {
+          if (this.catalogErrors.length > 0) {
+            this.showNotification('Catalog reloaded with validation issues', 'warning');
+          } else {
+            this.showNotification('Catalogs refreshed successfully', 'success');
+          }
+        } else if (this.catalogErrors.length > 0) {
+          this.showNotification('Catalog validation issues detected', 'warning');
+        }
+
+
   async loadDatasets() {
     try {
       const api = this.getElectronAPI();
@@ -201,6 +236,7 @@ class UIController {
       if (!api?.getDatasets) {
         setTimeout(() => this.loadDatasets(), 200);
         return;
+
       }
 
       this.datasets = await api.getDatasets();
@@ -209,33 +245,75 @@ class UIController {
       this.showNotification('Failed to load datasets', 'error');
     }
   }
-  
+
+  applyCatalogResponse(response) {
+    if (!response) {
+      return;
+    }
+
+    this.datasets = Array.isArray(response.datasets) ? response.datasets : [];
+    this.catalogErrors = Array.isArray(response.errors) ? response.errors : [];
+    this.catalogLastUpdated = response.lastUpdated || null;
+    this.catalogDir = response.catalogDir || null;
+
+    this.renderDatasetList();
+    this.renderCatalogErrors();
+    this.updateCatalogStatus();
+  }
+
   renderDatasetList() {
     const datasetList = document.getElementById('dataset-list');
     datasetList.innerHTML = '';
-    
+
+    if (!this.datasets.length) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'empty-state';
+      emptyState.textContent = 'No datasets available.';
+      datasetList.appendChild(emptyState);
+      return;
+    }
+
     this.datasets.forEach(dataset => {
       const item = document.createElement('div');
       item.className = 'dataset-item';
       item.dataset.id = dataset.id;
-      
+
       item.innerHTML = `
         <div class="dataset-name">${dataset.name}</div>
-        <div class="dataset-type">${dataset.type}</div>
+        <div class="dataset-type">${dataset.mediaType}${dataset.format ? ` · ${dataset.format}` : ''}</div>
       `;
-      
+
       item.addEventListener('click', () => {
         this.loadDataset(dataset.id);
       });
-      
+
       datasetList.appendChild(item);
     });
+
+    if (this.currentDataset) {
+      this.highlightDataset(this.currentDataset.id);
+    }
   }
   
   async loadDataset(datasetId) {
     try {
 
       if (window.electronAPI) {
+
+        const result = await window.electronAPI.loadDataset(datasetId);
+
+        if (result && result.success) {
+          const dataset = result.dataset || this.datasets.find(d => d.id === datasetId);
+          if (dataset) {
+            this.currentDataset = dataset;
+            this.updateDatasetInfo(dataset);
+            this.highlightDataset(datasetId);
+          }
+          this.showNotification('Dataset loaded successfully', 'success');
+        } else {
+          const errorMessage = (result && result.error) || 'Failed to load dataset';
+          this.showNotification(errorMessage, 'error');
+
         const descriptor = await window.electronAPI.loadDataset(datasetId);
 
         if (descriptor && descriptor.success === false) {
@@ -249,6 +327,7 @@ class UIController {
           this.currentDataset = dataset;
           this.updateDatasetInfo(dataset);
           this.highlightDataset(datasetId);
+
         }
 
       const api = this.getElectronAPI();
@@ -271,14 +350,65 @@ class UIController {
       this.showNotification('Failed to load dataset', 'error');
     }
   }
-  
+
   updateDatasetInfo(dataset) {
     const info = document.getElementById('dataset-info');
     info.innerHTML = `
       <h3>${dataset.name}</h3>
-      <p><strong>Type:</strong> ${dataset.type}</p>
-      <p><strong>Description:</strong> ${dataset.description}</p>
+      <p><strong>Media Type:</strong> ${dataset.mediaType}</p>
+      ${dataset.format ? `<p><strong>Format:</strong> ${dataset.format}</p>` : ''}
+      <p><strong>Source:</strong> ${dataset.sourceUri}</p>
+      ${dataset.description ? `<p>${dataset.description}</p>` : ''}
+      ${dataset.catalogFile ? `<p class="dataset-origin">Catalog: ${dataset.catalogFile}</p>` : ''}
     `;
+  }
+
+  renderCatalogErrors() {
+    const container = document.getElementById('catalog-errors');
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = '';
+
+    if (!this.catalogErrors.length) {
+      const message = document.createElement('div');
+      message.className = 'catalog-message';
+      message.textContent = 'No validation issues detected.';
+      container.appendChild(message);
+      container.classList.remove('has-errors');
+      return;
+    }
+
+    container.classList.add('has-errors');
+
+    const list = document.createElement('ul');
+    list.className = 'catalog-error-list';
+
+    this.catalogErrors.forEach((error) => {
+      const item = document.createElement('li');
+      const source = error.file ? `${error.file}` : error.type;
+      const datasetInfo = error.datasetId ? ` (dataset: ${error.datasetId})` : '';
+      item.innerHTML = `<span class="error-source">${source}:</span> ${error.message}${datasetInfo}`;
+      list.appendChild(item);
+    });
+
+    container.appendChild(list);
+  }
+
+  updateCatalogStatus() {
+    const lastUpdated = document.getElementById('catalog-last-updated');
+    const directory = document.getElementById('catalog-directory');
+
+    if (lastUpdated) {
+      lastUpdated.textContent = this.catalogLastUpdated
+        ? `Last loaded: ${new Date(this.catalogLastUpdated).toLocaleString()}`
+        : 'Catalogs have not been loaded yet.';
+    }
+
+    if (directory) {
+      directory.textContent = this.catalogDir ? `Source: ${this.catalogDir}` : '';
+    }
   }
   
   highlightDataset(datasetId) {
