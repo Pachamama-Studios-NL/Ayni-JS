@@ -5,6 +5,29 @@ console.log('Preload script loaded');
 // Expose a limited API to the renderer
 contextBridge.exposeInMainWorld('electronAPI', {
   // Dataset functions
+
+  getDatasets: () => ipcRenderer.invoke('get-datasets'),
+  refreshDatasets: () => ipcRenderer.invoke('refresh-datasets'),
+  loadDataset: (datasetId) => ipcRenderer.invoke('load-dataset', datasetId),
+  
+  // Event listeners
+  onSphereUpdate: (callback) => ipcRenderer.on('sphere-update', (event, data) => callback(data)),
+  onSliceUpdate: (callback) => ipcRenderer.on('slice-update', (event, data) => callback(data)),
+  onMediaControl: (callback) => ipcRenderer.on('media-control', (event, data) => callback(data)),
+  onLoadDataset: (callback) => ipcRenderer.on('load-dataset', (event, data) => callback(data)),
+  onResolutionChange: (callback) => ipcRenderer.on('resolution-change', (event, data) => callback(data)),
+
+  // Send sphere updates to main process
+  sendSphereUpdate: (data) => ipcRenderer.send('sphere-update', data),
+
+  sendResolutionChange: (data) => ipcRenderer.send('resolution-change', data),
+
+  sendSliceUpdate: (data) => ipcRenderer.send('slice-update', data),
+
+
+  // Remove all listeners
+  removeAllListeners: () => ipcRenderer.removeAllListeners()
+
   getDatasets: () => {
     console.log('getDatasets called from renderer');
     return ipcRenderer.invoke('get-datasets');
@@ -67,6 +90,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     console.log('sendMediaControl called with:', data);
     ipcRenderer.send('media-control', data);
   }
+
 });
 
 console.log('electronAPI exposed');

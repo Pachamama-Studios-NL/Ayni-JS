@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ocean-currents",
+    "name": "Ocean Currents",
+    "mediaType": "video",
+    "format": "video/mp4",
+    "sourceUri": "./assets/ocean-currents.mp4",
+    "description": "Global ocean current patterns"
+  },
+  {
+    "id": "aurora-stream",
+    "name": "Aurora Live Stream",
+    "mediaType": "stream",
+    "format": "video/hls",
+    "sourceUri": "https://example.com/aurora/playlist.m3u8",
+    "description": "Live aurora borealis imagery"
+  }
+]
