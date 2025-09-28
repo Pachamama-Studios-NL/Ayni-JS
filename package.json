@@ -1,0 +1,47 @@
+{
+  "name": "led-sphere-control",
+  "version": "1.0.0",
+  "description": "Control application for LED spherical displays",
+  "main": "core-app/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "keywords": [
+    "led",
+    "sphere",
+    "control",
+    "equirectangular",
+    "threejs"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^25.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "dependencies": {
+    "three": "^0.165.0",
+    "ws": "^8.13.0"
+  },
+  "build": {
+    "appId": "com.yourcompany.ledspherecontrol",
+    "productName": "LED Sphere Control",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "core-app/**/*",
+      "!core-app/node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

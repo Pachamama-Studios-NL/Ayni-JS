@@ -3,8 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Improved Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; worker-src 'self' blob:;">
     <title>LED Sphere Control</title>
     <link rel="stylesheet" href="css/main.css">
+    
+    <!-- Add import map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "../../node_modules/three/build/three.module.js"
+            }
+        }
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -74,15 +85,24 @@
                     </div>
                 </div>
 
-                <div class="panel-section">
-                    <h2>Slice Configuration</h2>
+                <div class="control-group">
+                    <h3>View Controls</h3>
+                    <div class="zoom-info">
+                        <span>Zoom: </span>
+                        <span id="zoom-level">0%</span>
+                    </div>
+                    <button id="reset-view" class="control-btn">
+                        <span class="btn-icon">🔄</span> Reset View
+                    </button>
+                    <h3>Slice Configuration</h3>
                     <div class="control-group">
                         <label>Number of Slices:</label>
-                        <input type="number" id="slice-count" min="1" max="6" value="1">
-                    </div>
-                    <div class="control-group">
-                        <label>Total Angle (degrees):</label>
-                        <input type="number" id="slice-angle" min="90" max="360" value="360" step="90">
+                        <select id="slice-count" class="slice-select">
+                            <option value="1">None</option>
+                            <option value="2">2 Slices</option>
+                            <option value="3">3 Slices</option>
+                            <option value="4">4 Slices</option>
+                        </select>
                     </div>
                     <button id="apply-slices" class="btn btn-primary">Apply Slices</button>
                 </div>
@@ -154,8 +174,8 @@
     <!-- Notification Container -->
     <div id="notification-container" class="notification-container"></div>
 
-    <!-- Scripts -->
-    <script src="js/three-renderer.js"></script>
-    <script src="js/ui-controller.js"></script>
+    <!-- Add these lines -->
+    <script type="module" src="js/three-renderer.js"></script>
+    <script type="module" src="js/ui-controller.js"></script>
 </body>
 </html>
