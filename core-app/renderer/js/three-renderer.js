@@ -19,9 +19,12 @@ class SphereRenderer {
         overlap: 0
       }
     };
-    
+
     this.sliceStates = new Map();
-    
+
+    this.renderResolution = { width: 2048, height: 1024 };
+    this.maxRenderResolution = { width: 4096, height: 2048 };
+
     this.init();
   }
   
@@ -60,10 +63,9 @@ class SphereRenderer {
       antialias: true,
       alpha: true
     });
-    
-    this.renderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    
+
+    this.applyRenderResolution();
+
     // Handle window resize
     window.addEventListener('resize', () => this.handleResize());
   }
@@ -151,13 +153,92 @@ class SphereRenderer {
   
   handleResize() {
     if (this.renderer && this.camera) {
-      this.renderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
-      
+      this.applyRenderResolution();
+
       // Update orthographic camera
       const aspect = this.canvas.clientWidth / this.canvas.clientHeight;
       this.camera.left = -aspect;
       this.camera.right = aspect;
       this.camera.updateProjectionMatrix();
+    }
+  }
+
+  setResolution(resolution) {
+    this.renderResolution = this.sanitizeResolution(resolution);
+    this.applyRenderResolution();
+    return this.renderResolution;
+  }
+
+  sanitizeResolution(resolution = {}) {
+    const minWidth = 512;
+    const minHeight = minWidth / 2;
+
+    const widthValue = Number(resolution.width);
+    const heightValue = Number(resolution.height);
+
+    const target = {
+      width: Number.isFinite(widthValue) ? Math.round(widthValue) : this.renderResolution.width,
+      height: Number.isFinite(heightValue) ? Math.round(heightValue) : this.renderResolution.height
+    };
+
+    if (target.width <= 0) {
+      target.width = this.renderResolution.width;
+    }
+
+    if (target.height <= 0) {
+      target.height = Math.round(target.width / 2);
+    }
+
+    target.width = Math.min(this.maxRenderResolution.width, Math.max(minWidth, target.width));
+    target.height = Math.min(this.maxRenderResolution.height, Math.max(minHeight, target.height));
+
+    // Enforce 2:1 aspect ratio (width = 2 * height)
+    target.height = Math.min(this.maxRenderResolution.height, Math.max(minHeight, Math.round(target.width / 2)));
+    target.width = Math.min(this.maxRenderResolution.width, Math.max(minWidth, target.height * 2));
+
+    if (target.width > this.maxRenderResolution.width) {
+      target.width = this.maxRenderResolution.width;
+      target.height = Math.round(target.width / 2);
+    }
+
+    if (target.height > this.maxRenderResolution.height) {
+      target.height = this.maxRenderResolution.height;
+      target.width = target.height * 2;
+    }
+
+    if (target.width < minWidth) {
+      target.width = minWidth;
+      target.height = Math.round(target.width / 2);
+    }
+
+    if (target.height < minHeight) {
+      target.height = minHeight;
+      target.width = target.height * 2;
+    }
+
+    return target;
+  }
+
+  applyRenderResolution() {
+    if (!this.renderer || !this.canvas) {
+      return;
+    }
+
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    const width = this.renderResolution.width;
+    const height = this.renderResolution.height;
+    const cssWidth = Math.max(1, Math.round(width / pixelRatio));
+    const cssHeight = Math.max(1, Math.round(height / pixelRatio));
+
+    this.renderer.setPixelRatio(pixelRatio);
+    this.renderer.setSize(cssWidth, cssHeight, false);
+
+    this.canvas.width = width;
+    this.canvas.height = height;
+
+    if (this.cubeCamera && this.cubeCamera.renderTarget && typeof this.cubeCamera.renderTarget.setSize === 'function') {
+      const cubeSize = Math.min(this.maxRenderResolution.height, Math.max(256, height));
+      this.cubeCamera.renderTarget.setSize(cubeSize, cubeSize);
     }
   }
   

@@ -7,6 +7,16 @@ let mainWindow;
 let wsServer;
 let sphereControl;
 
+function broadcastResolution(resolution, excludeClientId = null) {
+  if (mainWindow) {
+    mainWindow.webContents.send('resolution-change', resolution);
+  }
+
+  if (wsServer) {
+    wsServer.broadcast('resolution-change', resolution, excludeClientId);
+  }
+}
+
 function createWindow() {
   // Get primary display dimensions
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -78,21 +88,32 @@ function initializeWSServer() {
       mainWindow.webContents.send('media-control', data);
     }
   });
-  
+
   // Handle dataset loading
   wsServer.on('load-dataset', (data) => {
     if (mainWindow) {
       mainWindow.webContents.send('load-dataset', data);
     }
   });
-  
+
+  wsServer.on('resolution-change', (data, clientId) => {
+    const payload = data && data.data ? data.data : data;
+
+    if (sphereControl) {
+      const updated = sphereControl.updateResolution(payload);
+      broadcastResolution(updated, clientId);
+    } else {
+      broadcastResolution(payload, clientId);
+    }
+  });
+
   console.log('WebSocket server initialized');
 }
 
 // Initialize sphere control
 function initializeSphereControl() {
   sphereControl = new SphereControl();
-  
+
   // Handle sphere updates from renderer
   sphereControl.on('sphere-update', (data) => {
     // Broadcast to all connected clients
@@ -100,7 +121,7 @@ function initializeSphereControl() {
       wsServer.broadcast('sphere-update', data);
     }
   });
-  
+
   console.log('Sphere control initialized');
 }
 
@@ -136,6 +157,21 @@ ipcMain.handle('load-dataset', async (event, datasetId) => {
   // Load the specified dataset
   console.log(`Loading dataset: ${datasetId}`);
   return { success: true };
+});
+
+ipcMain.on('sphere-update', (event, data) => {
+  if (sphereControl) {
+    sphereControl.updateSphere(data);
+  }
+});
+
+ipcMain.on('resolution-change', (event, data) => {
+  if (sphereControl) {
+    const updated = sphereControl.updateResolution(data);
+    broadcastResolution(updated);
+  } else {
+    broadcastResolution(data);
+  }
 });
 
 // App event handlers
